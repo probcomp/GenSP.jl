@@ -1,0 +1,11 @@
+name = "GenProx"
+uuid = "4f04d0d6-512a-4468-8956-9155db99ad45"
+authors = ["Alex Lew <alexlew@mit.edu>"]
+version = "0.1.0"
+
+[deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+Gen = "ea4f424c-a589-11e8-07c0-fd5c91b9da4a"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
+StatsFuns = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
