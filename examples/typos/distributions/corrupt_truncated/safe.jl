@@ -16,7 +16,7 @@ function corrupt_inference_trunc(corrupted, word, max_len)
             word = {(:typo, j)} ~ guess_next_typo(word, corrupted)
         end
     end
-    return custom_importance(corrupt_proposal, 1)
+    return custom_importance(ChoiceMapDistribution(corrupt_proposal), 1)
 end
 
 corrupt_truncated = Marginal{String}(corrupt_model_trunc, corrupt_inference_trunc, :corrupted)

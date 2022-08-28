@@ -3,7 +3,7 @@
 struct CustomSMC <: ProxDistribution{ChoiceMap}
     initial_state             # :: State
     step_model    :: Function # State -> Target
-    step_proposal :: GenerativeFunction 
+    step_proposal :: Distribution{ChoiceMap} 
     num_steps     :: Int
     num_particles :: Int
 end
@@ -22,12 +22,12 @@ function random_weighted(c::CustomSMC, target)
             particle = simulate(c.step_proposal, (states[i],))
             # Score it under the new target
             new_target   = c.step_model(states[i])
-            target_score, new_state = Gen.assess(new_target.p, new_target.args, merge(get_choices(particle), new_target.constraints))
+            target_score, new_state = Gen.assess(new_target.p, new_target.args, merge(get_retval(particle), new_target.constraints))
             # Compute the weight of the new particle.
             target_weights[i] += target_score
             weights[i] += target_score - get_score(particle)
             # Update the particle.
-            Gen.set_submap!(particles[i], step, get_choices(particle))
+            Gen.set_submap!(particles[i], step, get_retval(particle))
             # Update the state.
             states[i] = new_state
         end
@@ -72,13 +72,13 @@ function estimate_logpdf(c::CustomSMC, retained_particle, target)
         for i in 1:c.num_particles
             # Generate a new particle.
             if i == 1 # retained particle
-                particle, = generate(c.step_proposal, (states[i],), get_submap(retained_particle, step))
+                particle, = generate(c.step_proposal, (states[i],), ValueChoiceMap{ChoiceMap}(get_submap(retained_particle, step)))
             else
                 particle = simulate(c.step_proposal, (states[i],))
             end
             # Score it under the new target
             new_target   = c.step_model(states[i])
-            target_score, new_state = Gen.assess(new_target.p, new_target.args, merge(get_choices(particle), new_target.constraints))
+            target_score, new_state = Gen.assess(new_target.p, new_target.args, merge(get_retval(particle), new_target.constraints))
             # Compute the weight of the new particle.
             target_weights[i] += target_score
             weights[i] += target_score - get_score(particle)

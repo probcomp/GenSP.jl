@@ -22,7 +22,7 @@ Gen.DistributionTrace{T, Dist}(val::T, args::Tuple, dist::Dist) where {T, Dist <
 
 @inline function Gen.simulate(dist::Dist, args::Tuple) where {T, Dist <: ProxDistribution{T}}
     val, weight = random_weighted(dist, args...)
-    DistributionTrace{T, Dist}(val, args, weight, dist)
+    Gen.DistributionTrace{T, Dist}(val, args, weight, dist)
 end
 
 @inline function Gen.propose(dist::ProxDistribution, args::Tuple)
