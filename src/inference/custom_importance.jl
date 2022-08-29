@@ -9,7 +9,7 @@ custom_importance(q, num_particles) = CustomImportance(q, num_particles)
 
 function random_weighted(c::CustomImportance, target)
     # Generate c.num_particles particles from the proposal
-    particles = [simulate(c.proposal, ()) for _ in 1:c.num_particles] # TODO: what arguments should c.proposal take?
+    particles = [simulate(c.proposal, (target,)) for _ in 1:c.num_particles]
     # Compute weights
     target_scores = [Gen.assess(target.p, target.args, merge(target.constraints, get_retval(p)))[1] for p in particles]
     weights = [target_score - get_score(p) for (target_score, p) in zip(target_scores, particles)]
@@ -30,9 +30,9 @@ end
 
 function estimate_logpdf(c::CustomImportance, choices, target)
     # Generate k-1 particles
-    unchosen = [Gen.simulate(c.proposal, ()) for _ in 1:c.num_particles-1]
+    unchosen = [Gen.simulate(c.proposal, (target,)) for _ in 1:c.num_particles-1]
     # Retained proposal trace
-    push!(unchosen, generate(c.proposal, (), ValueChoiceMap{ChoiceMap}(choices))[1])
+    push!(unchosen, Gen.generate(c.proposal, (target,), ValueChoiceMap{ChoiceMap}(choices))[1])
     # Compute weights
     target_scores = [Gen.assess(target.p, target.args, merge(target.constraints, get_retval(p)))[1] for p in unchosen]
     weights = [target_score - get_score(p) for (target_score, p) in zip(target_scores, unchosen)]

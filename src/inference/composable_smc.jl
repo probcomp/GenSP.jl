@@ -43,7 +43,7 @@ function run_smc(algorithm::SMCResample, retained=nothing)
         return collection
     end
 
-    # Otherwise we ahve to resample
+    # Otherwise we have to resample
     normalized_weights = exp.(log_normalized_weights)
     selected_particle_indices = [categorical(normalized_weights) for _ in 1:algorithm.how_many]
     if !isnothing(retained)
@@ -93,9 +93,9 @@ end
 num_particles(algorithm::SMCInit) = algorithm.num_particles
 final_target(algorithm::SMCInit) = algorithm.target
 function run_smc(algorithm::SMCInit, retained=nothing)
-    proposals = [propose(algorithm.q, ()) for _ in 1:algorithm.num_particles]
+    proposals = [propose(algorithm.q, (algorithm.target,)) for _ in 1:algorithm.num_particles]
     if !isnothing(retained)
-        proposals[end], = generate(algorithm.q, (), ValueChoiceMap{ChoiceMap}(retained))
+        proposals[end], = generate(algorithm.q, (algorithm.target,), ValueChoiceMap{ChoiceMap}(retained))
     end
     traces = [generate(algorithm.target.p, algorithm.target.args, merge(get_retval(p), algorithm.target.constraints))[1] for p in proposals]
     weights = [get_score(trace) - get_score(proposal) for (trace, proposal) in zip(traces, proposals)]
@@ -116,22 +116,26 @@ end
 num_particles(algorithm::GeneralSMCStep) = num_particles(algorithm.previous)
 final_target(algorithm::GeneralSMCStep) = algorithm.new_target
 function run_smc(algorithm::GeneralSMCStep, retained=nothing)
+    old_target = final_target(algorithm.previous)
+    old_target_latents = latent_selection(old_target)
+
     if !isnothing(retained)
         new_retained_trace, = Gen.generate(algorithm.new_target.p, algorithm.new_target.args, merge(algorithm.new_target.constraints, retained))
-        _, l_weight, old_retained_choices = propose(algorithm.l, (new_retained_trace,))
+        _, l_weight, old_retained_choices = propose(algorithm.l, (new_retained_trace, old_target))
         collection = run_smc(algorithm.previous, old_retained_choices)
-        k_weight, = Gen.assess(algorithm.k, (last(collection.particles),), ValueChoiceMap{ChoiceMap}(retained))
+        k_weight, = Gen.assess(algorithm.k, (last(collection.particles), algorithm.new_target), ValueChoiceMap{ChoiceMap}(retained))
         retained_weight = l_weight - k_weight + last(collection.weights) + get_score(new_retained_trace) - get_score(last(collection.particles))
     end
+    
     particles = Trace[]
     weights = Float64[]
-    old_target_latents = complement(selection_from_choicemap(final_target(algorithm.previous).constraints))
     idx = isnothing(retained) ? 0 : 1
+    
     for (particle, weight) in zip(collection.particles[1:end-idx], collection.weights[1:end-idx])
-        _, this_k_weight, new_choices = Gen.propose(algorithm.k, (particle,))
+        _, this_k_weight, new_choices = Gen.propose(algorithm.k, (particle, algorithm.new_target))
         new_trace, = Gen.generate(algorithm.new_target.p, algorithm.new_target.args, merge(algorithm.new_target.constraints, new_choices))
         old_choices = Gen.get_selected(Gen.get_choices(particle), old_target_latents)
-        this_l_weight, = Gen.assess(algorithm.l, (new_trace,), ValueChoiceMap{ChoiceMap}(old_choices))
+        this_l_weight, = Gen.assess(algorithm.l, (new_trace, old_target), ValueChoiceMap{ChoiceMap}(old_choices))
         this_weight = this_l_weight - this_k_weight + weight + get_score(new_trace) - get_score(particle)
         push!(particles, new_trace)
         push!(weights, this_weight)
@@ -158,7 +162,7 @@ num_particles(algorithm::ChangeTargetSMCStep) = num_particles(algorithm.previous
 final_target(algorithm::ChangeTargetSMCStep) = algorithm.new_target
 function run_smc(algorithm::ChangeTargetSMCStep, retained=nothing)
     collection = run_smc(algorithm.previous, retained)
-    old_target_latents = complement(selection_from_choicemap(final_target(algorithm.previous).constraints))
+    old_target_latents = latent_selection(final_target(algorithm.previous))
     particles = Trace[]
     weights = Float64[]
     for (particle, weight) in zip(collection.particles, collection.weights)
@@ -207,7 +211,7 @@ function run_smc(algorithm::ExtendingSMCStep, retained=nothing)
         # The previous retained map does not include them:
         previous_latents = Gen.get_selected(retained, complement(selection_from_choicemap(discard)))
         # Evaluate the `k` probability of the discard
-        forward_weight_retained, = Gen.assess(algorithm.k, (previous_trace,), ValueChoiceMap{ChoiceMap}(discard))
+        forward_weight_retained, = Gen.assess(algorithm.k, (previous_trace, new_target), ValueChoiceMap{ChoiceMap}(discard))
     end
     collection = run_smc(algorithm.previous, isnothing(retained) ? nothing : previous_latents)
 
@@ -215,7 +219,7 @@ function run_smc(algorithm::ExtendingSMCStep, retained=nothing)
     weights = Float64[]
     idx = isnothing(retained) ? 0 : 1
     for (particle, weight) in zip(collection.particles[1:end-idx], collection.weights[1:end-idx])
-        extension = simulate(algorithm.k, (particle,))
+        extension = simulate(algorithm.k, (particle, new_target))
         extension, k_score = get_retval(extension), get_score(extension)
         new_trace, model_score_change, _, _ = update(particle, algorithm.new_args, algorithm.argdiffs, algorithm.new_constraints)
         push!(particles, new_trace)
@@ -239,7 +243,7 @@ function run_smc(alg::SMCRejuvenate, retained=nothing)
     if !isnothing(retained)
         new_retained_trace, = generate(final_target(alg).p, final_target(alg).args, merge(final_target(alg).constraints, retained))
         previous_trace, = Gen.reversal(alg.kernel)(new_retained_trace)
-        previous_latents = Gen.get_selected(get_choices(previous_trace), complement(selection_from_choicemap(final_target(alg).constraints)))
+        previous_latents = get_latents(final_target(alg), previous_trace)
     end
     collection = run_smc(alg.previous, isnothing(retained) ? nothing : previous_latents)
     particles = Trace[]

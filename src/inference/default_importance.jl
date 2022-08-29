@@ -5,12 +5,12 @@ importance(num_particles) = DefaultImportance(num_particles)
 
 function random_weighted(alg::DefaultImportance, target)
     # Generate alg.num_particles particles
-    particles = [generate(target.p, target.args, target.constraints) for _ in 1:alg.num_particles]
+    particles = [Gen.generate(target.p, target.args, target.constraints) for _ in 1:alg.num_particles]
     # Compute weights
     weights = map(last, particles)
 
     if all(isinf.(weights))
-        return get_choices(particles[1]), NaN # TODO: make this weight a real estimate of the probability of this particle being returned
+        return get_latents(target, particles[1]), NaN # TODO: make this weight a real estimate of the probability of this particle being returned
     end
 
     # Select one particle at random, based on the weights
@@ -20,7 +20,7 @@ function random_weighted(alg::DefaultImportance, target)
     selected_particle_index = categorical(exp.(normalized_weights))
     selected_particle = particles[selected_particle_index][1]
     # Return the selected particle, and an estimate of Q
-    return get_choices(selected_particle), get_score(selected_particle) - average_weight
+    return get_latents(target, selected_particle), get_score(selected_particle) - average_weight
 end
 
 function estimate_logpdf(alg::DefaultImportance, choices, target)

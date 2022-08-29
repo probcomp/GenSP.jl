@@ -1,10 +1,10 @@
 # Produces an 'unfold'-like choicemap that has top-level keys 1, 2, ..., n.
 # At each step, the choices are those of the step_proposal.
 struct CustomSMC <: ProxDistribution{ChoiceMap}
-    initial_state             # :: State
-    step_model    :: Function # State -> Target
-    step_proposal :: Distribution{ChoiceMap} 
-    num_steps     :: Int
+    initial_state             # Final Target -> State
+    step_model    :: Function # State, Final Target -> Next Target
+    step_proposal :: Distribution{ChoiceMap} # State, Next Target, Final Target -> ChoiceMap
+    num_steps     :: Function # Final Target -> Int
     num_particles :: Int
 end
 custom_smc(init,step,q,n,k) = CustomSMC(init,step,q,n,k)
@@ -12,24 +12,27 @@ custom_smc(init,step,q,n,k) = CustomSMC(init,step,q,n,k)
 # here, target is over the entire trajectory
 function random_weighted(c::CustomSMC, target)
     # Run SMC.
-    states    = [c.initial_state for _ in 1:c.num_particles]
+    init      = c.initial_state(target)
+    states    = [init for _ in 1:c.num_particles]
     particles = [choicemap() for _ in 1:c.num_particles]
     target_weights   = [0.0 for _ in 1:c.num_particles]
     weights   = [0.0 for _ in 1:c.num_particles]
-    for step in 1:c.num_steps
+    N = c.num_steps(target)
+    for step in 1:N
         for i in 1:c.num_particles
-            # Generate a new particle.
-            particle = simulate(c.step_proposal, (states[i],))
-            # Score it under the new target
+            # Next target
             new_target   = c.step_model(states[i])
-            target_score, new_state = Gen.assess(new_target.p, new_target.args, merge(get_retval(particle), new_target.constraints))
+            # Generate a new particle.
+            particle = simulate(c.step_proposal, (states[i], new_target, target))
+            # Score it under the new target
+            new_target_trace = generate(new_target, get_retval(particle))
             # Compute the weight of the new particle.
-            target_weights[i] += target_score
-            weights[i] += target_score - get_score(particle)
+            target_weights[i] += get_score(new_target_trace)
+            weights[i]        += get_score(new_target_trace) - get_score(particle)
             # Update the particle.
             Gen.set_submap!(particles[i], step, get_retval(particle))
             # Update the state.
-            states[i] = new_state
+            states[i] = get_retval(new_target_trace)
         end
 
         # Resample the particles.
@@ -44,7 +47,7 @@ function random_weighted(c::CustomSMC, target)
     end
 
     # Reweight for the final target
-    final_target_scores = [Gen.assess(target.p, target.args, merge(p, target.constraints))[1] for p in particles]
+    final_target_scores = [Gen.get_score(generate(target, p)) for p in particles]
     final_weights = [w - tw + ftw for (w, tw, ftw) in zip(weights, target_weights, final_target_scores)]
     
     if all(isinf.(final_weights))
@@ -64,28 +67,31 @@ end
 
 function estimate_logpdf(c::CustomSMC, retained_particle, target)
     # Run cSMC
-    states    = [c.initial_state for _ in 1:c.num_particles]
+    init = c.initial_state(target)
+    states    = [init for _ in 1:c.num_particles]
     particles = [choicemap() for _ in 1:c.num_particles]
-    target_weights   = [0.0 for _ in 1:c.num_particles]
+    target_weights = [0.0 for _ in 1:c.num_particles]
     weights   = [0.0 for _ in 1:c.num_particles]
-    for step in 1:c.num_steps
+    N = c.num_steps(target)
+    for step in 1:N
         for i in 1:c.num_particles
+            # New target
+            new_target   = c.step_model(states[i])
             # Generate a new particle.
             if i == 1 # retained particle
-                particle, = generate(c.step_proposal, (states[i],), ValueChoiceMap{ChoiceMap}(get_submap(retained_particle, step)))
+                particle, = Gen.generate(c.step_proposal, (states[i], new_target, target), ValueChoiceMap{ChoiceMap}(get_submap(retained_particle, step)))
             else
-                particle = simulate(c.step_proposal, (states[i],))
+                particle = Gen.simulate(c.step_proposal, (states[i], new_target, target))
             end
             # Score it under the new target
-            new_target   = c.step_model(states[i])
-            target_score, new_state = Gen.assess(new_target.p, new_target.args, merge(get_retval(particle), new_target.constraints))
+            new_target_trace = generate(new_target, get_retval(particle))
             # Compute the weight of the new particle.
-            target_weights[i] += target_score
-            weights[i] += target_score - get_score(particle)
+            target_weights[i] += get_score(new_target_trace)
+            weights[i] += get_score(new_target_trace) - get_score(particle)
             # Update the particle.
             Gen.set_submap!(particles[i], step, get_choices(particle))
             # Update the state.
-            states[i] = new_state
+            states[i] = get_retval(new_target_trace)
         end
 
         # Resample the particles.
@@ -98,7 +104,7 @@ function estimate_logpdf(c::CustomSMC, retained_particle, target)
     end
 
     # Reweight for the final target
-    final_target_scores = [Gen.assess(target.p, target.args, merge(p, target.constraints))[1] for p in particles]
+    final_target_scores = [Gen.get_score(generate(target, p)) for p in particles]
     final_weights = [w - tw + ftw for (w, tw, ftw) in zip(weights, target_weights, final_target_scores)]
     
     if all(isinf.(final_weights))
