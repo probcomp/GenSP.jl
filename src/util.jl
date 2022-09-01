@@ -12,3 +12,9 @@ function selection_from_choicemap(choicemap)
     end
     selection
 end
+
+function logmeanexp(weights)
+    logsumexp(weights) - log(length(weights))
+end
+
+export logmeanexp
