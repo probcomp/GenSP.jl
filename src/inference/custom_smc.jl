@@ -21,7 +21,7 @@ function random_weighted(c::CustomSMC, target)
     for step in 1:N
         for i in 1:c.num_particles
             # Next target
-            new_target   = c.step_model(states[i])
+            new_target   = c.step_model(states[i], target)
             # Generate a new particle.
             particle = simulate(c.step_proposal, (states[i], new_target, target))
             # Score it under the new target
@@ -76,7 +76,7 @@ function estimate_logpdf(c::CustomSMC, retained_particle, target)
     for step in 1:N
         for i in 1:c.num_particles
             # New target
-            new_target   = c.step_model(states[i])
+            new_target   = c.step_model(states[i], target)
             # Generate a new particle.
             if i == 1 # retained particle
                 particle, = Gen.generate(c.step_proposal, (states[i], new_target, target), ValueChoiceMap{ChoiceMap}(get_submap(retained_particle, step)))
@@ -89,24 +89,26 @@ function estimate_logpdf(c::CustomSMC, retained_particle, target)
             target_weights[i] += get_score(new_target_trace)
             weights[i] += get_score(new_target_trace) - get_score(particle)
             # Update the particle.
-            Gen.set_submap!(particles[i], step, get_choices(particle))
+            Gen.set_submap!(particles[i], step, get_retval(particle))
             # Update the state.
             states[i] = get_retval(new_target_trace)
         end
 
         # Resample the particles.
-        normalized_weights = exp.(weights .- logsumexp(weights))
+        total_weight = logsumexp(weights)
+        average_weight = total_weight - log(c.num_particles)
+        normalized_weights = exp.(weights .- total_weight)
         selected_particle_indices = [1, [categorical(normalized_weights) for _ in 1:c.num_particles-1]...]
         particles = [choicemap(particles[i]) for i in selected_particle_indices]
         target_weights = [target_weights[i] for i in selected_particle_indices]
-        weights   = [weights[i] for i in selected_particle_indices]
+        weights   = [average_weight for i in selected_particle_indices]
         states    = [states[i] for i in selected_particle_indices]
     end
 
     # Reweight for the final target
     final_target_scores = [Gen.get_score(generate(target, p)) for p in particles]
     final_weights = [w - tw + ftw for (w, tw, ftw) in zip(weights, target_weights, final_target_scores)]
-    
+
     if all(isinf.(final_weights))
         return NaN # TODO: make this weight a real estimate of the probability of this particle being returned
     end

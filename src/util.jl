@@ -13,8 +13,13 @@ function selection_from_choicemap(choicemap)
     selection
 end
 
+function lognormalize(log_weights)
+    exp.(log_weights .- Gen.logsumexp(log_weights))
+end
+
+
 function logmeanexp(weights)
     logsumexp(weights) - log(length(weights))
 end
 
-export logmeanexp
+export logmeanexp, lognormalize, selection_from_choicemap

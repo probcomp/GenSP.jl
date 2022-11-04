@@ -1,6 +1,7 @@
 # Now for the approximate agglomerative clustering algorithm.
 # We first need to write `agglom` as a probabilistic program.
-initial_clustering(data) = Set([Set{Int}(i) for i in 1:length(data)])
+initial_clustering(data::Vector) = Set([Set{Int}(i) for i in 1:length(data)])
+initial_clustering(target::Target) = initial_clustering(target.args[1])
 @gen function agglom_step(current_partition, data, alpha, predicate)
     merge ~ random_merge(current_partition, data, alpha, predicate)
     return apply_merge!(copy(current_partition), merge)
@@ -27,7 +28,7 @@ function agglom_meta_next_target(c, final_target)
 end
 
 @gen function agglom_meta_proposal(c, new_target, target)
-    data, alpha = new_target.args
+    _, data, alpha = new_target.args
     clustering = target.constraints[:final_clustering]
     {*} ~ agglom_step(c, data, alpha, m -> is_valid_merge(clustering, c, m))
 end

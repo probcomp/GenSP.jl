@@ -15,8 +15,9 @@ using LinearAlgebra
     end
 
     # generate noisy measurements of the agent's location at each time point
-    xs ~ mvnormal(map(p -> p.x, locations), noise * I + zeros(num_ticks, num_ticks))
-    ys ~ mvnormal(map(p -> p.y, locations), noise * I + zeros(num_ticks, num_ticks))
+    noise_cov = I * noise^2 + zeros(num_ticks, num_ticks)
+    xs ~ mvnormal(map(p -> p.x, locations), noise_cov)
+    ys ~ mvnormal(map(p -> p.y, locations), noise_cov)
 end
 
 noisy_walk = ChoiceMapDistribution(noisy_walk_model, select(:xs, :ys), importance(1))

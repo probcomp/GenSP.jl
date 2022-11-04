@@ -2,6 +2,14 @@ using StatsBase: mean
 using StatsFuns: loggamma
 using CSV, DataFrames
 
+include("distributions/crp.jl")
+include("distributions/gaussian_bag.jl")
+include("distributions/agglom/shared.jl")
+include("distributions/agglom/dirac.jl")
+include("distributions/random_merge.jl")
+include("distributions/agglom/safe.jl")
+
+
 dataset = map(Float64, CSV.read("data/galaxies.csv", DataFrame; header=false)[!, 1])
 
 GAUSSIAN_HYPERS = GaussianHypers(0, 1 / 100, 1 / 2, 1 / 2)
@@ -27,11 +35,11 @@ end
 constraints = choicemap(:condition_this => 0.0)
 
 # Importance sampling from the prior
-traces_prior, weights_prior, lml_prior = importance_sampling(dpmm, (dataset, 1.0), observations, 1000);
+traces_prior, weights_prior, lml_prior = importance_sampling(dpmm, (dataset, 1.0), constraints, 1000);
 
 # Importance sampling with agglom
-@gen function dpmm_proposal(dataset)
-    partition ~ agglom(dataset)
+@gen function dpmm_proposal(dataset, alpha)
+    partition ~ agglom(dataset, alpha)
     return partition
 end
-traces_agglom, weights_agglom, lml_agglom = importance_sampling(dpmm, (dataset, 1.0), observations, dpmm_proposal, (dataset,), 1000)
+traces_agglom, weights_agglom, lml_agglom = importance_sampling(dpmm, (dataset, 1.0), constraints, dpmm_proposal, (dataset,1.0), 1000)

@@ -35,6 +35,11 @@ function get_latents(target::Target, trace::Trace)
     return get_latents(target, Gen.get_choices(trace))
 end
 
+"""
+    trace::Trace = generate(target::Target, choices::ChoiceMap)
+
+Given a `Target` and a choice map of latents, generate a trace of the target's generative function.
+"""
 function generate(target::Target, choices::ChoiceMap)
     return first(Gen.generate(target.p, target.args, merge(choices, target.constraints)))
 end

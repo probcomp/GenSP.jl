@@ -35,7 +35,7 @@ function GenProx.estimate_logpdf(::NoisyWalkUnsafe, meas, start, dest, speed, no
         locations = walk_path(maybe_path, speed, dt, num_ticks)
     end
 
-    noise_matrix = noise * I + zeros(num_ticks, num_ticks)
+    noise_matrix = noise^2 * I + zeros(num_ticks, num_ticks)
     xs, ys = meas[:xs], meas[:ys]
     x_locs, y_locs = map(p -> p.x, locations), map(p -> p.y, locations)
     return logpdf(mvnormal, xs, x_locs, noise_matrix) + logpdf(mvnormal, ys, y_locs, noise_matrix)
