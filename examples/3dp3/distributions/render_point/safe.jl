@@ -17,13 +17,20 @@ NUM_NEIGHBORS = 100
     # Categorical probabilities
     near_weights = -0.5 .* (dists .^ 2 / sigma^2)
     far_weight = last(near_weights)
-    log_total = logsumexp([near_weights..., log(m-NUM_NEIGHBORS) + far_weight])
+    log_total = logsumexp(near_weights) #[near_weights..., log(m-NUM_NEIGHBORS) + far_weight])
+    log_total = logsumexp(log_total, log(m-NUM_NEIGHBORS) + far_weight)
 
-    weights = fill(far_weight - log_total, m)
-    weights[nearest_indices] = near_weights .- log_total
-    probs = exp.(weights)
-    index ~ categorical(probs)
+    weights = fill(Base.Math.exp_fast(far_weight - log_total), m)
+    weights[nearest_indices] = Base.Math.exp_fast.(near_weights .- log_total)
+    # for (idx, wt) in zip(nearest_indices, near_weights)
+    #     weights[idx] = Base.Math.exp_fast(wt - log_total)
+    # end
+#    weights[nearest_indices] = near_weights .- log_total
+    #probs = Base.Math.exp_fast.(weights)
+    index ~ categorical(weights)
 end
 
-render_point_safe = Marginal{Vector{Float64}}(render_point_model, custom_importance(ChoiceMapDistribution(render_point_proposal), 1), :point)
+inference = custom_importance(ChoiceMapDistribution(render_point_proposal), 1)
+inference = ChoiceMapDistribution(render_point_proposal)
+render_point_safe = Marginal{Vector{Float64}}(render_point_model, inference, :point)
 
