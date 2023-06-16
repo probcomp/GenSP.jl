@@ -15,11 +15,12 @@ function GenProx.estimate_logpdf(::RenderPointUnsafe, y, X, X_tree, sigma)
     # Categorical probabilities
     near_weights = -0.5 .* (dists .^ 2 / sigma^2)
     far_weight = last(near_weights)
-    log_total = logsumexp([near_weights..., log(m-NUM_NEIGHBORS) + far_weight])
-    weights = fill(far_weight - log_total, m)
-    weights[nearest_indices] = near_weights .- log_total
-    probs = exp.(weights)
-    index = categorical(probs)
-    # Weight is actual p(y | x) / q(x)
-    return logpdf(broadcasted_normal, y, X[:, index], sigma) - log(probs[index])
+    log_total = logsumexp(near_weights) #[near_weights..., log(m-NUM_NEIGHBORS) + far_weight])
+    log_total = logsumexp(log_total, log(m-NUM_NEIGHBORS) + far_weight)
+
+    weights = fill(Base.Math.exp_fast(far_weight - log_total), m)
+    weights[nearest_indices] = Base.Math.exp_fast.(near_weights .- log_total)
+    index = categorical(weights)
+    # Weight is actual p(x, y) / q(x)
+    return logpdf(broadcasted_normal, y, X[:, index], sigma) - log(m) - log(weights[index])
 end
