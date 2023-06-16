@@ -12,11 +12,12 @@ function random_weighted(alg::MCMC, target)
 
     # Generate an initial proposal
     _, initial_weight, initial_choices = Gen.propose(alg.initial_distribution, (alg_target,))
-    initial_trace, model_score = generate(alg_target, initial_choices)
+    initial_trace = generate(alg_target, initial_choices)
+    model_score = get_score(initial_trace)
     weight = model_score - initial_weight
 
     # Run the kernel
-    moved_trace, = kernel(initial_trace, alg.kernel_args...)
+    moved_trace, = alg.kernel(initial_trace, alg.kernel_args...)
     moved_choices = get_choices(moved_trace)
     latents = get_latents(alg_target, moved_choices)
 
