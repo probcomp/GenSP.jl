@@ -28,7 +28,7 @@ The `how_many` parameter controls the number of particles in the resulting colle
 """
 struct SMCResample <: SMCAlgorithm
     previous :: SMCAlgorithm
-    ess_threshold :: Float64 # a value of 0 will always resample
+    ess_threshold :: Float64 # a value of 1 will always resample
     how_many :: Int
 end
 
@@ -38,8 +38,8 @@ function run_smc(algorithm::SMCResample, retained=nothing)
     collection = run_smc(algorithm.previous, retained)
     num_particles = length(collection.particles)
     total_weight = logsumexp(collection.weights)
-    log_normalized_weights = collection.weights - total_weight
-    if Gen.effective_sample_size(log_normalized_weights) > algorithm.ess_threshold
+    log_normalized_weights = collection.weights .- total_weight
+    if Gen.effective_sample_size(log_normalized_weights) > algorithm.ess_threshold * num_particles
         return collection
     end
 
@@ -93,12 +93,18 @@ end
 num_particles(algorithm::SMCInit) = algorithm.num_particles
 final_target(algorithm::SMCInit) = algorithm.target
 function run_smc(algorithm::SMCInit, retained=nothing)
-    proposals = [propose(algorithm.q, (algorithm.target,)) for _ in 1:algorithm.num_particles]
-    if !isnothing(retained)
-        proposals[end], = generate(algorithm.q, (algorithm.target,), ValueChoiceMap{ChoiceMap}(retained))
+    traces = Vector{Trace}(undef, algorithm.num_particles)
+    weights = Vector{Float64}(undef, algorithm.num_particles)
+    Threads.@threads for i in 1:algorithm.num_particles
+        if !isnothing(retained) && i == algorithm.num_particles
+            proposed_trace, = Gen.generate(algorithm.q, (algorithm.target,), ValueChoiceMap{ChoiceMap}(retained))
+        else
+            proposed_trace = simulate(algorithm.q, (algorithm.target,))
+        end
+        model_trace, = Gen.generate(algorithm.target.p, algorithm.target.args, merge(get_retval(proposed_trace), algorithm.target.constraints))
+        weights[i] = get_score(model_trace) - get_score(proposed_trace)
+        traces[i] = model_trace
     end
-    traces = [generate(algorithm.target.p, algorithm.target.args, merge(get_retval(p), algorithm.target.constraints))[1] for p in proposals]
-    weights = [get_score(trace) - get_score(proposal) for (trace, proposal) in zip(traces, proposals)]
     return ParticleCollection(traces, weights, 0.0)
 end
 
@@ -163,14 +169,16 @@ final_target(algorithm::ChangeTargetSMCStep) = algorithm.new_target
 function run_smc(algorithm::ChangeTargetSMCStep, retained=nothing)
     collection = run_smc(algorithm.previous, retained)
     old_target_latents = latent_selection(final_target(algorithm.previous))
-    particles = Trace[]
-    weights = Float64[]
-    for (particle, weight) in zip(collection.particles, collection.weights)
+    N = num_particles(algorithm.previous)
+    particles = Vector{Trace}(undef, N)
+    weights = Vector{Float64}(undef, N)
+    Threads.@threads for i in 1:N 
+        (particle, weight) = collection.particles[i], collection.weights[i]
         latents = Gen.get_selected(Gen.get_choices(particle), old_target_latents)
-        new_trace, = generate(algorithm.new_target.p, algorithm.new_target.args, merge(algorithm.new_target.constraints, latents))
+        new_trace, = Gen.generate(algorithm.new_target.p, algorithm.new_target.args, merge(algorithm.new_target.constraints, latents))
         this_weight = get_score(new_trace) - get_score(particle) + weight
-        push!(particles, new_trace)
-        push!(weights, this_weight)
+        particles[i] = new_trace
+        weights[i] = this_weight
     end
     return ParticleCollection(particles, weights, collection.lml_est)
 end
@@ -215,19 +223,21 @@ function run_smc(algorithm::ExtendingSMCStep, retained=nothing)
     end
     collection = run_smc(algorithm.previous, isnothing(retained) ? nothing : previous_latents)
 
-    particles = Trace[]
-    weights = Float64[]
+    N = num_particles(algorithm.previous)
+    particles = Vector{Trace}(undef, N)
+    weights = zeros(N)
     idx = isnothing(retained) ? 0 : 1
-    for (particle, weight) in zip(collection.particles[1:end-idx], collection.weights[1:end-idx])
+    Threads.@threads for i in 1:(N-idx)
+        particle, weight = collection.particles[i], collection.weights[i]
         extension = simulate(algorithm.k, (particle, new_target))
         extension, k_score = get_retval(extension), get_score(extension)
-        new_trace, model_score_change, _, _ = update(particle, algorithm.new_args, algorithm.argdiffs, algorithm.new_constraints)
-        push!(particles, new_trace)
-        push!(weights, weight - k_score + model_score_change)
+        new_trace, model_score_change, _, _ = update(particle, algorithm.new_args, algorithm.argdiffs, merge(extension, algorithm.new_constraints))
+        particles[i] = new_trace
+        weights[i] = weight - k_score + model_score_change
     end
     if !isnothing(retained)
-        push!(particles, new_retained_trace)
-        push!(weights, last(collection.weights) + forward_weight_retained + get_score(new_retained_trace) - get_score(last(collection.particles)))
+        particles[end] = new_retained_trace
+        weights[end] = last(collection.weights) + forward_weight_retained + get_score(new_retained_trace) - get_score(last(collection.particles))
     end 
     return ParticleCollection(particles, weights, collection.lml_est)
 end
@@ -268,8 +278,8 @@ function random_weighted(g::SMCAlgorithm, target::Target)
     probs = exp.(weights .- total_weight)
     particle_index = categorical(probs)
     particle = particle_collection.particles[particle_index]
-    # TODO: only the choices that are latent should be returned
-    return get_choices(particle), particle_collection.lml_est + total_weight - log(length(particle_collection.particles))
+    return Gen.get_selected(get_choices(particle), latent_selection(target)), 
+           get_score(particle) - (particle_collection.lml_est + total_weight - log(length(particle_collection.particles)))
 end
 
 function estimate_logpdf(g::SMCAlgorithm, choices::ChoiceMap, target::Target)
