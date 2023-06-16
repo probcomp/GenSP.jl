@@ -60,5 +60,5 @@ function Gen.logpdf(::CorruptTruncatedExact, corrupted, word, max_typos)
             end
         end
     end
-    return isempty(logprobs) ? -100 : Gen.logsumexp(logprobs)
+    return isempty(logprobs) ? GenProx.estimate_logpdf(corrupt, corrupted, word) : Gen.logsumexp(logprobs)
 end
