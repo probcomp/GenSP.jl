@@ -7,7 +7,7 @@
     corrupted ~ dirac(word)
 end
 
-@gen function corrupt_proposal_trunc()
+@gen function corrupt_proposal_trunc(target)
     word, max_len = target.args
     corrupted     = target.constraints[:corrupted]
     j = 0
