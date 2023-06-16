@@ -35,4 +35,6 @@ end
     (weight, choices.val)
 end
 
+(dist::ProxDistribution)(args...) = first(random_weighted(dist, args...))
+
 export random_weighted, estimate_logpdf, ProxDistribution
