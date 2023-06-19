@@ -108,3 +108,5 @@ function GenSP.estimate_logpdf(e::Enumeration, choices, target)
     total_weight = logsumexp(weights)
     return get_score(tr) - total_weight
 end
+
+export enumeration
