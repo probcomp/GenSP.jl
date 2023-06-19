@@ -1,7 +1,7 @@
 # An algorithm is a distribution that takes a Target as input and 
 # outputs a ChoiceMap.
 
-struct CustomImportance <: ProxDistribution{ChoiceMap}
+struct CustomImportance <: SPDistribution{ChoiceMap}
     proposal :: Distribution{ChoiceMap}
     num_particles :: Int
 end

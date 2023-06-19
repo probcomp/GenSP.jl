@@ -1,6 +1,6 @@
 # Produces an 'unfold'-like choicemap that has top-level keys 1, 2, ..., n.
 # At each step, the choices are those of the step_proposal.
-struct CustomSMC <: ProxDistribution{ChoiceMap}
+struct CustomSMC <: SPDistribution{ChoiceMap}
     initial_state             # Final Target -> State
     step_model    :: Function # State, Final Target -> Next Target
     step_proposal :: Distribution{ChoiceMap} # State, Next Target, Final Target -> ChoiceMap

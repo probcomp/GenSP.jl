@@ -1,4 +1,4 @@
-using GenProx
+using GenSP
 using Gen
 using Test
 

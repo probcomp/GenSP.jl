@@ -2,14 +2,14 @@
 # the marginal distribution of a particular address 
 # in a larger model.
 """
-    Marginal{T}(model, inference, address) <: ProxDistribution{T}
+    Marginal{T}(model, inference, address) <: SPDistribution{T}
 
 Given a `model` with a `T`-valued choice at address `address`, and a function `inference`
 taking values of that choice to inference algorithms for inferring the model's latents,
-produce a new `ProxDistribution{T}` representing the marginal distribution of `address`
+produce a new `SPDistribution{T}` representing the marginal distribution of `address`
 within the generative model.
 """
-struct Marginal{T} <: ProxDistribution{T}
+struct Marginal{T} <: SPDistribution{T}
     p :: GenerativeFunction # generative function representing a joint distribution
     q :: Distribution{ChoiceMap}
     addr
@@ -29,7 +29,10 @@ end
 function estimate_logpdf(m::Marginal{T}, val, args...) where T
     target = Target(m.p, args, choicemap(m.addr => val))
     _, weight, choices = Gen.propose(m.q, (target,))
-    choices = merge(choices, choicemap(m.addr => val))
+    # This is faster, but may not work if `choices` is not mutable...
+    choices[m.addr] = val
+    # Slower, but more general, alternative:
+    # choices = merge(choices, choicemap(m.addr => val))
     model_weight = Gen.assess(m.p, args, choices)[1]
     return isinf(model_weight) ? model_weight : model_weight - weight
 end

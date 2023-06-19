@@ -1,7 +1,7 @@
 # Enumerative inference.
 # WARNING: assumes that the target has a fixed number of latent variables,
 # each of which is discrete with finite, static support per target.
-struct Enumeration <: ProxDistribution{ChoiceMap} 
+struct Enumeration <: SPDistribution{ChoiceMap} 
     addresses :: Function
 end
 
@@ -58,12 +58,12 @@ function get_support(trace)
     @assert false "Enumerative inference currently supports only discrete latent variables, given choice with trace type $(tyepof(trace))."
 end
 
-function GenProx.random_weighted(e::Enumeration, target::Target)
+function GenSP.random_weighted(e::Enumeration, target::Target)
     # Get latent addresses
     addresses = e.addresses(target)
 
     # Enumerate the support of each latent choice.
-    initial_trace = GenProx.generate(target, choicemap())
+    initial_trace = GenSP.generate(target, choicemap())
 
     @assert initial_trace isa Gen.DynamicDSLTrace "Enumerative inference currently supports only DynamicDSL generative functions."
 
@@ -75,7 +75,7 @@ function GenProx.random_weighted(e::Enumeration, target::Target)
     weights    = Float64[]
     for assignment in Iterators.product(supports...)
         choices = choicemap([address => assignment for (address, assignment) in zip(addresses, assignment)]...)
-        push!(weights, get_score(GenProx.generate(target, choices)))
+        push!(weights, get_score(GenSP.generate(target, choices)))
         push!(choicemaps, choices)
     end
 
@@ -87,11 +87,11 @@ function GenProx.random_weighted(e::Enumeration, target::Target)
     return selected_choices, normalized_weights[selected_index]
 end
 
-function GenProx.estimate_logpdf(e::Enumeration, choices, target)
+function GenSP.estimate_logpdf(e::Enumeration, choices, target)
     # Get latent addresses
     addresses = e.addresses(target)
 
-    tr = GenProx.generate(target, choices)
+    tr = GenSP.generate(target, choices)
     @assert tr isa Gen.DynamicDSLTrace "Enumerative inference currently supports only DynamicDSL generative functions."
 
     # Enumerate the support of each latent choice.
@@ -101,7 +101,7 @@ function GenProx.estimate_logpdf(e::Enumeration, choices, target)
     weights    = Float64[]
     for assignment in Iterators.product(supports...)
         choices = choicemap([address => assignment for (address, assignment) in zip(addresses, assignment)]...)
-        push!(weights, get_score(GenProx.generate(target, choices)))
+        push!(weights, get_score(GenSP.generate(target, choices)))
     end
 
     # Normalize

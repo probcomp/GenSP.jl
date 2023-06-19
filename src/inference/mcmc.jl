@@ -1,4 +1,4 @@
-struct MCMC <: ProxDistribution{ChoiceMap}
+struct MCMC <: SPDistribution{ChoiceMap}
     initial_distribution :: Distribution{ChoiceMap}
     kernel :: Function # Gen kernel DSL
     kernel_args :: Tuple

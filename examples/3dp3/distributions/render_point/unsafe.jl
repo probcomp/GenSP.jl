@@ -1,14 +1,14 @@
-struct RenderPointUnsafe <: ProxDistribution{Vector{Float64}} end
+struct RenderPointUnsafe <: SPDistribution{Vector{Float64}} end
 
 const render_point_unsafe = RenderPointUnsafe()
 
-function GenProx.random_weighted(::RenderPointUnsafe, X, X_tree, sigma)
+function GenSP.random_weighted(::RenderPointUnsafe, X, X_tree, sigma)
     error("Not implemented")
 end
 
 NUM_NEIGHBORS = 100
 
-function GenProx.estimate_logpdf(::RenderPointUnsafe, y, X, X_tree, sigma)
+function GenSP.estimate_logpdf(::RenderPointUnsafe, y, X, X_tree, sigma)
     m = size(X, 2)
     # Nearest neighbors lookup
     nearest_indices, dists = NearestNeighbors.knn(X_tree, y, NUM_NEIGHBORS, true)

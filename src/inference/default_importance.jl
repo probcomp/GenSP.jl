@@ -1,4 +1,4 @@
-struct DefaultImportance <: ProxDistribution{ChoiceMap}
+struct DefaultImportance <: SPDistribution{ChoiceMap}
     num_particles :: Int
 end
 importance(num_particles) = DefaultImportance(num_particles)

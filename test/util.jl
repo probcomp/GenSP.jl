@@ -10,7 +10,7 @@
     end
 
     cm = Gen.get_choices(simulate(f, ()))
-    selection = GenProx.selection_from_choicemap(cm)
+    selection = GenSP.selection_from_choicemap(cm)
 
     @test :x in selection
     @test (:y => 1) in selection

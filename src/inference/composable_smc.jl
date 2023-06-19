@@ -19,7 +19,7 @@ An `SMCAlgorithm` supports three methods:
     ensuring that the final particle in the collection agrees with the retained particle.
 
 """
-abstract type SMCAlgorithm <: ProxDistribution{ChoiceMap} end
+abstract type SMCAlgorithm <: SPDistribution{ChoiceMap} end
 
 
 """
@@ -209,7 +209,7 @@ function run_smc(algorithm::ExtendingSMCStep, retained=nothing)
     if !isnothing(retained)
         old_target = final_target(algorithm.previous)
         # Create a retained trace.
-        new_retained_trace, = generate(new_target.p, new_target.args, merge(new_target.constraints, retained))
+        new_retained_trace, = Gen.generate(new_target.p, new_target.args, merge(new_target.constraints, retained))
         # Use Gen.update to revert to the previous target.
         # TODO: reusing the same argdiffs to go *backward* is not always correct.
         # We should probably apply some sort of 'inverse' transformation to each argdiff.
@@ -251,7 +251,7 @@ num_particles(algorithm::SMCRejuvenate) = num_particles(algorithm.previous)
 final_target(algorithm::SMCRejuvenate) = final_target(algorithm.previous)
 function run_smc(alg::SMCRejuvenate, retained=nothing)
     if !isnothing(retained)
-        new_retained_trace, = generate(final_target(alg).p, final_target(alg).args, merge(final_target(alg).constraints, retained))
+        new_retained_trace, = Gen.generate(final_target(alg).p, final_target(alg).args, merge(final_target(alg).constraints, retained))
         previous_trace, = Gen.reversal(alg.kernel)(new_retained_trace)
         previous_latents = get_latents(final_target(alg), previous_trace)
     end
@@ -268,7 +268,7 @@ function run_smc(alg::SMCRejuvenate, retained=nothing)
     return ParticleCollection(particles, collection.weights, collection.lml_est)
 end
 
-# Implementing the Prox distribution interface for arbitrary SMC algorithms:
+# Implementing the SP distribution interface for arbitrary SMC algorithms:
 function random_weighted(g::SMCAlgorithm, target::Target)
     algorithm = ChangeTargetSMCStep(g, target)
     particle_collection = run_smc(algorithm)

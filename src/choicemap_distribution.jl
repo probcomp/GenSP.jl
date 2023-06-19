@@ -1,11 +1,11 @@
 """
-    dist::ProxDistribution{ChoiceMap} = ChoiceMapDistribution(p::GenerativeFunction, selection::Selection, custom_q::Union{Nothing, Distribution{ChoiceMap}})
+    dist::SPDistribution{ChoiceMap} = ChoiceMapDistribution(p::GenerativeFunction, selection::Selection, custom_q::Union{Nothing, Distribution{ChoiceMap}})
 
 Construct a new distribution `dist` over choice maps, corresponding to the marginal distribution of `selection`
 under the generative function `p`. If provided, `custom_q` is used to marginalize unselected choices when estimating
 densities.
 """
-struct ChoiceMapDistribution <: ProxDistribution{ChoiceMap}
+struct ChoiceMapDistribution <: SPDistribution{ChoiceMap}
     p         :: GenerativeFunction
     selection :: Selection
     custom_q  :: Union{Nothing, Distribution{ChoiceMap}}
