@@ -20,7 +20,7 @@ with the following key differences:
 GenSP's inference algorithms are `SPDistribution{ChoiceMap}`s 
 that take as input a `Target` posterior and produce as output
 a `ChoiceMap` approximately sampled from the posterior. 
-(`Target` is a struct type that Prox exposes, 
+(`Target` is a struct type that GenSP exposes, 
 wrapping together a generative function, arguments to it,
 and a `ChoiceMap` of observations.) Because inference algorithms
 are `SPDistribution`s, they can estimate their own output densities.
@@ -35,8 +35,8 @@ by selecting only the choices meant to serve as the proposal.
 ### Marginalization
 New distributions can be created by marginalizing generative functions:
 
-* `Marginal{T}(gen_fn, inf_alg, addr)`
-* `ChoiceMapDistribution(gen_fn, selection=AllSelection(), inf_alg=default_importance(1))`
+* `Marginal{T}(gen_fn, inf_alg, addr)` -- the marginal distribution of the choice at address `addr` in `gen_fn`.
+* `ChoiceMapDistribution(gen_fn, selection=AllSelection(), inf_alg=default_importance(1))` -- the marginal distribution of `selection` under `gen_fn`.
 
 
 
